@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.post('/register', async (req, res) => {
     const { email, password, first_name, last_name, username, phone_number, weight, height, goal, diet_prefer, gender, age } = req.body;
-    if ( !first_name || !last_name || !username || !email || !password || !goal || !age || !gender) {return res.status(400).send('Missing required fields.');}
+    if ( !first_name || !last_name || !username || !email || !password || !goal || age === undefined || gender === undefined) {return res.status(400).send('Missing required fields.');}
 
     try {
       const saltRounds = 10;
@@ -68,7 +68,9 @@ router.post('/login', async (req, res) => {
         );
 
         res.json({
-            message: 'Login successful', token });
+            message: 'Login successful',
+            token,
+            userId: user.user_id });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -151,5 +153,65 @@ router.post('/reset-password', async (req, res) => {
         res.status(500).json({ message: 'Server error'});
     }
 });
+
+router.get('/user/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const [rows] = await db.promise().query(
+            'SELECT user_id, first_name, last_name, email, username, password_hash, phone_number, weight, height, goal, created_at, diet_prefer, gender, age FROM users WHERE user_id = ?',
+            [userId]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('Error fetching user:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.put('/user/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const {height, weight, age, gender, goal } = req.body;
+
+    try {
+        await db.promise().query(
+            'UPDATE users SET height = ?, weight = ?, age = ?, gender = ?, goal = ? WHERE user_id = ?',
+            [height, weight, age, gender, goal, userId]
+        );
+
+        res.json({ message: 'user profile updated successfully' });
+    } catch (err) {
+        console.error('Error updating user profile:', err);
+        res.status(500).json({ message: 'Failed to update user profile' });
+    }
+});
+
+router.get('/progress/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+
+        const [userRows] = await db.promise().query(
+            'SELECT height, weight, goal, created_at FROM users WHERE user_id = ?',
+            [userId]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({
+            start_date: userRows[0].created_at,
+            height: userRows[0].height,
+            weight: userRows[0].weight,
+            goal: userRows[0].goal
+        });
+    } catch (err) {
+        console.error('Error fetching progress data:', err);
+        res.status(500).json({ message: 'Failed to fetch progress data' });
+    }
+});
+
 
 module.exports = router;

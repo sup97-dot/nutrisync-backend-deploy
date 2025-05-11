@@ -11,7 +11,7 @@ router.get('/fetch-recipe', async (req, res) => {
     try {
         const response = await axios.get('https://api.spoonacular.com/recipes/complexSearch', {
             params: {
-                number: 100,
+                number: 21,
                 type: 'main course, breakfast, snack',
                 minCalories: 200,
                 maxCalories: 1000,
@@ -44,6 +44,13 @@ router.get('/fetch-recipe', async (req, res) => {
                     params: { apiKey : process.env.SPOONACULAR_API_KEY }
                 });
                 instructions = infoResponse.data.instructions || 'No instructions available';
+
+                if (infoResponse.data.extendedIngredients && infoResponse.data.extendedIngredients.length > 0) {
+                    const ingredientInsertSql = 'INSERT INTO recipe_ingredients (api_recipe_id, ingredient) VALUES (?, ?)';
+                    for (const ingredientObj of infoResponse.data.extendedIngredients) {
+                        await db.promise().query(ingredientInsertSql, [id, ingredientObj.original]);
+                    }
+                }
             } catch (infoErr) {
                 console.error(`Failed to fetch detailed instructions for recipe ${id}`, infoErr);
                 instructions = 'No instructions available';
